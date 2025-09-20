@@ -1,0 +1,19 @@
+{
+  "compilerOptions": {
+    "target": "ES2020", // Versão do JS gerada
+    "module": "ESNext",
+    "moduleResolution": "node",
+    "rootDir": "src", // Onde ficam os arquivos TS
+    "outDir": "dist", // Para onde vão os arquivos compilados
+    "strict": true, // Habilita checagens mais rigorosas
+    "esModuleInterop": true, // Permite importar libs JS como "import express from 'express'"
+    "forceConsistentCasingInFileNames": true, // Garante nomes de arquivos consistentes
+    "skipLibCheck": true, // Pula checagem de tipos em libs externas (mais rápido)
+    "baseUrl": "./src", // base para os imports
+    "paths": {
+      "#/*": ["*"] // alias "@/..." aponta para src/
+    }
+  },
+  "include": ["src"], // Compila apenas arquivos dentro de src
+  "exclude": ["node_modules", "dist"] // Ignora estas pastas
+}
