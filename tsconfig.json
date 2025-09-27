@@ -8,10 +8,12 @@
     "strict": true, // Habilita checagens mais rigorosas
     "esModuleInterop": true, // Permite importar libs JS como "import express from 'express'"
     "forceConsistentCasingInFileNames": true, // Garante nomes de arquivos consistentes
+    "allowImportingTsExtensions": false,
+    "resolveJsonModule": true,
     "skipLibCheck": true, // Pula checagem de tipos em libs externas (mais rápido)
     "baseUrl": "./src", // base para os imports
     "paths": {
-      "#/*": ["*"] // alias "@/..." aponta para src/
+      "@/*": ["./*"]
     }
   },
   "include": ["src"], // Compila apenas arquivos dentro de src
