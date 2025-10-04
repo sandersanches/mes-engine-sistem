@@ -1,0 +1,540 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Account {
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime
+  User              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([provider, providerAccountId])
+}
+
+model AuditLog {
+  id          String   @id
+  userId      String?
+  entityId    String
+  changes     Json?
+  description String?
+  ipAddress   String?
+  userAgent   String?
+  createdAt   DateTime @default(now())
+  action      Action
+  entity      Page
+  User        User?    @relation(fields: [userId], references: [id])
+
+  @@index([entity, entityId])
+  @@index([userId])
+}
+
+model Authenticator {
+  credentialID         String  @unique
+  userId               String
+  providerAccountId    String
+  credentialPublicKey  String
+  counter              Int
+  credentialDeviceType String
+  credentialBackedUp   Boolean
+  transports           String?
+  User                 User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, credentialID])
+}
+
+model Company {
+  id        String    @id
+  name      String
+  cnpj      String
+  createdAt DateTime  @default(now())
+  updatedAt DateTime
+  deletedAt DateTime?
+}
+
+model ConformityAnalysisResult {
+  id                           String                     @id
+  orderId                      String
+  result                       Boolean
+  machineId                    String?
+  moduleNumb                   Int?
+  createdAt                    DateTime                   @default(now())
+  updatedAt                    DateTime
+  deletedAt                    DateTime?
+  requiredConformityAnalysisId String
+  productId                    String
+  lot                          String?
+  description                  String?
+  userId                       String
+  Machine                      Machine?                   @relation(fields: [machineId], references: [id])
+  Order                        Order                      @relation(fields: [orderId], references: [id])
+  Product                      Product                    @relation(fields: [productId], references: [id], onDelete: Cascade)
+  RequiredConformityAnalysis   RequiredConformityAnalysis @relation(fields: [requiredConformityAnalysisId], references: [id])
+  User                         User                       @relation(fields: [userId], references: [id])
+}
+
+model Department {
+  id         String       @id
+  name       String
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime
+  deletedAt  DateTime?
+  WorkCenter WorkCenter[]
+}
+
+model Downtime {
+  id                  String             @id
+  workCenterId        String
+  stopCodeId          String?
+  machineId           String?
+  description         String?
+  startTime           DateTime
+  endTime             DateTime?
+  userId              String?
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime
+  deletedAt           DateTime?
+  orderId             String?
+  productionMetricsId String
+  durationSeconds     BigInt?
+  Machine             Machine?           @relation(fields: [machineId], references: [id])
+  Order               Order?             @relation(fields: [orderId], references: [id])
+  ProductionMetrics   ProductionMetrics  @relation(fields: [productionMetricsId], references: [id])
+  StopCode            StopCode?          @relation(fields: [stopCodeId], references: [id])
+  User                User?              @relation(fields: [userId], references: [id])
+  WorkCenter          WorkCenter         @relation(fields: [workCenterId], references: [id])
+  IntervalDowntime    IntervalDowntime[]
+}
+
+model IntervalDowntime {
+  id                  String            @id
+  downtimeId          String
+  productionMetricsId String
+  startTime           DateTime
+  endTime             DateTime?
+  durationSeconds     BigInt?
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime
+  deletedAt           DateTime?
+  workCenterId        String
+  Downtime            Downtime          @relation(fields: [downtimeId], references: [id])
+  ProductionMetrics   ProductionMetrics @relation(fields: [productionMetricsId], references: [id])
+  WorkCenter          WorkCenter        @relation(fields: [workCenterId], references: [id])
+}
+
+model Machine {
+  id                       String                     @id
+  name                     String
+  createdAt                DateTime                   @default(now())
+  updatedAt                DateTime
+  deletedAt                DateTime?
+  workCenterId             String?
+  moduleName               String                     @default("Módulo")
+  moduleNumber             Int                        @default(1)
+  ConformityAnalysisResult ConformityAnalysisResult[]
+  Downtime                 Downtime[]
+  WorkCenter               WorkCenter?                @relation(fields: [workCenterId], references: [id])
+  RangeAnalysisResult      RangeAnalysisResult[]
+  Rejection                Rejection[]
+}
+
+model Order {
+  id                       String                     @id
+  workCenterId             String
+  productId                String
+  startDate                DateTime?
+  endDate                  DateTime?
+  targetQuantity           Int
+  producedQuantity         BigInt                     @default(0)
+  rejectedQuantuty         Int                        @default(0)
+  createdAt                DateTime                   @default(now())
+  updatedAt                DateTime
+  deletedAt                DateTime?
+  status                   OrderStatus                @default(RELEASED)
+  scheduledDate            DateTime
+  initialQuantity          BigInt                     @default(0)
+  finalQuantity            BigInt                     @default(0)
+  conterStarted            Boolean                    @default(false)
+  ConformityAnalysisResult ConformityAnalysisResult[]
+  Downtime                 Downtime[]
+  WorkCenter               WorkCenter                 @relation(fields: [workCenterId], references: [id])
+  WorkCenter_Product       WorkCenter_Product         @relation(fields: [workCenterId, productId], references: [workCenterId, productId])
+  ProductionMetrics        ProductionMetrics[]
+  RangeAnalysisResult      RangeAnalysisResult[]
+  Rejection                Rejection[]
+}
+
+model PasswordResetToken {
+  id        String   @id
+  email     String
+  token     String   @unique
+  expires   DateTime
+  createdAt DateTime @default(now())
+}
+
+model Permission {
+  id             String           @id
+  action         Action
+  page           Page
+  createdAt      DateTime         @default(now())
+  deletedAt      DateTime?
+  updatedAt      DateTime
+  RolePermission RolePermission[]
+}
+
+model Product {
+  id                         String                       @id
+  name                       String
+  sku                        String
+  description                String?
+  createdAt                  DateTime                     @default(now())
+  updatedAt                  DateTime
+  deletedAt                  DateTime?
+  ConformityAnalysisResult   ConformityAnalysisResult[]
+  RangeAnalysisResult        RangeAnalysisResult[]
+  RequiredConformityAnalysis RequiredConformityAnalysis[]
+  RequiredRangeAnalysis      RequiredRangeAnalysis[]
+  WorkCenter_Product         WorkCenter_Product[]
+}
+
+model ProductionMetrics {
+  id               String             @id
+  workCenterId     String
+  orderId          String?
+  producedQuantity BigInt             @default(0)
+  rejectedQuantity Int                @default(0)
+  shiftId          String
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime
+  initialQuantity  BigInt             @default(0)
+  finalQuantity    BigInt             @default(0)
+  hour             DateTime
+  finalTime        DateTime
+  initialTime      DateTime
+  filterOrder      String
+  Downtime         Downtime[]
+  IntervalDowntime IntervalDowntime[]
+  Order            Order?             @relation(fields: [orderId], references: [id])
+  Shift            Shift              @relation(fields: [shiftId], references: [id])
+  WorkCenter       WorkCenter         @relation(fields: [workCenterId], references: [id])
+  Rejection        Rejection[]
+
+  @@unique([hour, workCenterId, shiftId, filterOrder])
+}
+
+model RangeAnalysisResult {
+  id                      String                @id
+  minValue                Float
+  maxValue                Float
+  result                  Float
+  orderId                 String
+  machineId               String?
+  moduleNumb              Int?
+  createdAt               DateTime              @default(now())
+  updatedAt               DateTime
+  deletedAt               DateTime?
+  requiredRangeAnalysisId String
+  productId               String
+  lot                     String?
+  description             String?
+  userId                  String
+  Machine                 Machine?              @relation(fields: [machineId], references: [id])
+  Order                   Order                 @relation(fields: [orderId], references: [id])
+  Product                 Product               @relation(fields: [productId], references: [id], onDelete: Cascade)
+  RequiredRangeAnalysis   RequiredRangeAnalysis @relation(fields: [requiredRangeAnalysisId], references: [id])
+  User                    User                  @relation(fields: [userId], references: [id])
+}
+
+model RejectCode {
+  id                  String      @id
+  name                String
+  code                String
+  description         String
+  rejectGroupId       String
+  rejectGroupMasterId String
+  machineRequired     Boolean
+  createdAt           DateTime    @default(now())
+  updatedAt           DateTime
+  deletedAt           DateTime?
+  RejectGroup         RejectGroup @relation(fields: [rejectGroupId], references: [id])
+  Rejection           Rejection[]
+}
+
+model RejectGroup {
+  id                String        @id
+  name              String
+  description       String
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime
+  parentId          String?
+  parentMasterId    String?
+  deletedAt         DateTime?
+  RejectCode        RejectCode[]
+  RejectGroup       RejectGroup?  @relation("RejectGroupToRejectGroup", fields: [parentId], references: [id])
+  other_RejectGroup RejectGroup[] @relation("RejectGroupToRejectGroup")
+}
+
+model Rejection {
+  id                  String            @id
+  workCenterId        String
+  orderId             String?
+  productionMetricsId String
+  rejectCodeId        String?
+  machineId           String?
+  description         String?
+  userId              String?
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime
+  deletedAt           DateTime?
+  quantity            Int
+  Machine             Machine?          @relation(fields: [machineId], references: [id])
+  Order               Order?            @relation(fields: [orderId], references: [id])
+  ProductionMetrics   ProductionMetrics @relation(fields: [productionMetricsId], references: [id])
+  RejectCode          RejectCode?       @relation(fields: [rejectCodeId], references: [id])
+  User                User?             @relation(fields: [userId], references: [id])
+  WorkCenter          WorkCenter        @relation(fields: [workCenterId], references: [id])
+}
+
+model RequiredConformityAnalysis {
+  id                       String                     @id
+  name                     String
+  createdAt                DateTime                   @default(now())
+  updatedAt                DateTime
+  deletedAt                DateTime?
+  productId                String
+  requiredLot              Boolean                    @default(false)
+  requiredMachine          Boolean                    @default(false)
+  ConformityAnalysisResult ConformityAnalysisResult[]
+  Product                  Product                    @relation(fields: [productId], references: [id], onDelete: Cascade)
+}
+
+model RequiredRangeAnalysis {
+  id                  String                @id
+  name                String
+  minValue            Float
+  maxValue            Float
+  unit                String
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime
+  deletedAt           DateTime?
+  productId           String
+  requiredLot         Boolean               @default(false)
+  requiredMachine     Boolean               @default(false)
+  RangeAnalysisResult RangeAnalysisResult[]
+  Product             Product               @relation(fields: [productId], references: [id], onDelete: Cascade)
+}
+
+model Role {
+  id             String           @id
+  name           String
+  updatedAt      DateTime
+  deletedAt      DateTime?
+  isSuperAdmin   Boolean          @default(false)
+  createdAt      DateTime         @default(now())
+  RolePermission RolePermission[]
+  User           User[]
+}
+
+model RolePermission {
+  id           String     @id
+  roleId       String
+  permissionId String
+  createdAt    DateTime   @default(now())
+  deletedAt    DateTime?
+  updatedAt    DateTime
+  Permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  Role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, permissionId])
+}
+
+model Session {
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime
+  User         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Shift {
+  id                String              @id
+  name              String
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime
+  deletedAt         DateTime?
+  startTime         DateTime            @db.Time(4)
+  endTime           DateTime            @db.Time(4)
+  ProductionMetrics ProductionMetrics[]
+}
+
+model StopCode {
+  id                String     @id
+  code              String
+  description       String
+  stopGroupId       String
+  machineRequired   Boolean
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime
+  deletedAt         DateTime?
+  name              String
+  stopGroupMasterId String
+  plannedStop       Boolean
+  Downtime          Downtime[]
+  StopGroup         StopGroup  @relation(fields: [stopGroupId], references: [id])
+}
+
+model StopGroup {
+  id              String      @id
+  name            String
+  description     String
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime
+  parentId        String?
+  deletedAt       DateTime?
+  parentMasterId  String?
+  StopCode        StopCode[]
+  StopGroup       StopGroup?  @relation("StopGroupToStopGroup", fields: [parentId], references: [id])
+  other_StopGroup StopGroup[] @relation("StopGroupToStopGroup")
+}
+
+model User {
+  id                       String                     @id
+  name                     String?
+  email                    String                     @unique
+  emailVerified            DateTime?
+  image                    String?
+  createdAt                DateTime                   @default(now())
+  updatedAt                DateTime
+  deletedAt                DateTime?
+  roleId                   String?
+  password                 String?
+  Account                  Account[]
+  AuditLog                 AuditLog[]
+  Authenticator            Authenticator[]
+  ConformityAnalysisResult ConformityAnalysisResult[]
+  Downtime                 Downtime[]
+  RangeAnalysisResult      RangeAnalysisResult[]
+  Rejection                Rejection[]
+  Session                  Session[]
+  Role                     Role?                      @relation(fields: [roleId], references: [id])
+  WorkCenter_user          WorkCenter_user[]
+}
+
+model VerificationToken {
+  identifier String
+  token      String
+  expires    DateTime
+
+  @@id([identifier, token])
+}
+
+model WorkCenter {
+  id                 String               @id
+  name               String
+  departmentId       String
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime
+  deletedAt          DateTime?
+  status             WorkCenterStatus     @default(NO_PROGRAM)
+  Downtime           Downtime[]
+  IntervalDowntime   IntervalDowntime[]
+  Machine            Machine[]
+  Order              Order[]
+  ProductionMetrics  ProductionMetrics[]
+  Rejection          Rejection[]
+  Department         Department           @relation(fields: [departmentId], references: [id])
+  WorkCenter_Product WorkCenter_Product[]
+  WorkCenter_user    WorkCenter_user[]
+}
+
+model WorkCenter_Product {
+  workCenterId String
+  productId    String
+  nominalSpeed Float
+  unit         String
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime
+  deletedAt    DateTime?
+  Order        Order[]
+  Product      Product    @relation(fields: [productId], references: [id], onDelete: Cascade)
+  WorkCenter   WorkCenter @relation(fields: [workCenterId], references: [id], onDelete: Cascade)
+
+  @@id([workCenterId, productId])
+}
+
+model WorkCenter_user {
+  workCenterId String
+  userId       String
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime
+  deletedAt    DateTime?
+  User         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  WorkCenter   WorkCenter @relation(fields: [workCenterId], references: [id], onDelete: Cascade)
+
+  @@id([workCenterId, userId])
+}
+
+enum Action {
+  ALL
+  CREATE
+  READ
+  UPDATE
+  DELETE
+}
+
+enum OrderStatus {
+  RELEASED
+  BLOCKED
+  RUNNING
+  INTERRUPTED
+  CLOSED
+}
+
+enum Page {
+  PLAYGROUND
+  PLAYGROUND_DASHBOARD
+  PLAYGROUND_ORDERS
+  ANALYTICS
+  ANALYTICS_OEE
+  ANALYTICS_PRODUCTIONS
+  ANALYTICS_DOWNTIMES
+  REGISTER
+  REGISTER_STOP_CODES
+  REGISTER_DEPARTMENTS
+  REGISTER_WORK_CENTERS
+  REGISTER_MACHINES
+  REGISTER_PRODUCTS
+  SETTINGS
+  SETTINGS_USERS
+  SETTINGS_ROLES
+  SETTINGS_SHIFTS
+  SETTINGS_THEMES
+  INSPECT
+  INSPECT_REGISTERS
+  REGISTER_REJECT_CODES
+  SISTEM
+  CEP
+  CEP_DASHBOARD
+}
+
+enum WorkCenterStatus {
+  STOPPED
+  PRODUCTION
+  NO_PROGRAM
+  PLANNED_STOP
+}

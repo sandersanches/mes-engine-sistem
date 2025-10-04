@@ -1,23 +1,16 @@
-import express from "express";
-import cors from "cors";
-import { ENV } from "./config/env.js"; // importa e valida o env
-import router from "./routes/index.js";
-import { errorHandler } from "./middlewares/errorHandler.js";
+import "dotenv/config";
+import { collectMetrics } from "./services/metrics/collect-metrics";
 
-const app = express();
-app.use(cors());
-app.use(express.json());
-app.use("/api", router);
+async function main() {
+  console.log("🚀 Iniciando coleta de métricas...");
 
-// Middleware global de erro
-app.use(errorHandler);
+  const metrics = await collectMetrics();
 
-app.get("/", (_req, res) =>
-  res.json({ message: "API funcionando", env: ENV.NODE_ENV }),
-);
+  console.log("📊 Métricas coletadas:");
+  console.table(metrics);
+}
 
-app.listen(ENV.PORT, () => {
-  console.log(
-    `Servidor rodando em http://localhost:${ENV.PORT} (env: ${ENV.NODE_ENV})`,
-  );
+main().catch((err) => {
+  console.error("❌ Erro na execução principal:", err);
+  process.exit(1);
 });
