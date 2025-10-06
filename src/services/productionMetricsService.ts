@@ -1,0 +1,67 @@
+// src/services/productionMetricsService.ts
+import { prisma } from "../lib/prisma";
+
+type upsertProductionMetricsProps = {
+  hour: Date;
+  workCenterId: string;
+  shiftId: string;
+  filterOrder: string;
+  initialQuantity: number;
+  finalQuantity: number;
+  initialTime: Date;
+  finalTime: Date;
+  orderId: string | null;
+};
+
+export async function upsertProductionMetric({
+  hour,
+  workCenterId,
+  shiftId,
+  filterOrder,
+  finalQuantity,
+  initialTime,
+  finalTime,
+  orderId,
+  initialQuantity,
+}: upsertProductionMetricsProps) {
+  try {
+    const productionMetric = await prisma.productionMetrics.upsert({
+      where: {
+        hour_workCenterId_shiftId_filterOrder: {
+          hour,
+          workCenterId,
+          shiftId,
+          filterOrder,
+        },
+      },
+      update: {
+        finalQuantity: BigInt(finalQuantity),
+        finalTime: new Date(finalTime),
+      },
+      create: {
+        hour,
+        workCenterId,
+        orderId,
+        shiftId,
+        initialQuantity: BigInt(initialQuantity),
+        finalQuantity: BigInt(finalQuantity),
+        initialTime: new Date(initialTime),
+        finalTime: new Date(finalTime),
+        filterOrder: filterOrder,
+      },
+    });
+    return { success: true, productionMetric };
+  } catch (err) {
+    if (err instanceof Error) {
+      console.error(
+        "Erro ao criar ou atualizar productionMetrics:",
+        err.message,
+      );
+    } else {
+      console.error(
+        "Erro desconhecido ao criar ou atualizar productionMetrics",
+      );
+    }
+    return { success: false };
+  }
+}
