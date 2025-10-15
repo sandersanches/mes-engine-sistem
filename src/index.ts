@@ -1,4 +1,6 @@
+//src\index.ts
 import { collectMetrics } from "@/collectMetrics";
+import { ENV } from "./config/env";
 
 async function mainLoop() {
   try {
@@ -11,7 +13,7 @@ async function mainLoop() {
     }
   } finally {
     // Garante que o próximo loop só começa após o anterior terminar
-    setTimeout(mainLoop, 5000);
+    setTimeout(mainLoop, ENV.METRICS_INTERVAL_SECONDS * 1000);
   }
 }
 

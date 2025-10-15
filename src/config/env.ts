@@ -1,3 +1,4 @@
+//src\config\env.ts
 import dotenv from "dotenv";
 import { z } from "zod";
 
@@ -32,14 +33,18 @@ const envSchema = z.object({
     .min(1, { message: "INFLUX_MEASUREMENT is required" }),
 
   // 🔹 Intervalo do motor de métricas
-  METRICS_INTERVAL: z.preprocess((val) => {
+  METRICS_INTERVAL_SECONDS: z.preprocess((val) => {
     if (typeof val === "string" && val.trim() !== "") {
       const n = Number(val);
       return Number.isNaN(n) ? undefined : n;
     }
     if (typeof val === "number") return val;
     return undefined;
-  }, z.number().int().positive().default(5000)),
+  }, z.number().int().positive().default(5)),
+  DOWNTIME_THRESHOLD_SECONDS: z.coerce
+    .number()
+    .min(10, "Tempo mínimo inválido")
+    .default(30),
 });
 
 // Valida process.env
@@ -64,5 +69,6 @@ export const ENV = {
   INFLUX_BUCKET: parsed.data.INFLUX_BUCKET,
   INFLUX_MEASUREMENT: parsed.data.INFLUX_MEASUREMENT,
 
-  METRICS_INTERVAL: parsed.data.METRICS_INTERVAL,
+  METRICS_INTERVAL_SECONDS: parsed.data.METRICS_INTERVAL_SECONDS,
+  DOWNTIME_THRESHOLD_SECONDS: parsed.data.DOWNTIME_THRESHOLD_SECONDS,
 } as const;

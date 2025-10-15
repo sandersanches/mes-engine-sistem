@@ -1,4 +1,5 @@
 // src/services/productionMetricsService.ts
+import { ProductionMetrics } from "@prisma/client";
 import { prisma } from "../lib/prisma";
 
 type upsertProductionMetricsProps = {
@@ -64,4 +65,20 @@ export async function upsertProductionMetric({
     }
     return { success: false };
   }
+}
+
+export async function updateProductionMetric(props: {
+  id: string;
+  finalQuantity: number;
+  finalTime: Date;
+}): Promise<ProductionMetrics> {
+  return await prisma.productionMetrics.update({
+    where: {
+      id: props.id,
+    },
+    data: {
+      finalQuantity: BigInt(props.finalQuantity),
+      finalTime: new Date(props.finalTime),
+    },
+  });
 }

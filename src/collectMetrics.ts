@@ -37,7 +37,7 @@ export async function collectMetrics() {
       );
 
       if (points.length === 0) {
-        console.log(`⏸️ ${wc.name}: nenhum ponto novo.`);
+        console.log(`⏸️  ${wc.name}: nenhum ponto novo.`);
         continue;
       }
 
@@ -53,7 +53,7 @@ export async function collectMetrics() {
       });
 
       if (processedMetric.success) {
-        console.log(`🔔 Métricas de ${wc.name} finalizadas com sucesso .`);
+        // console.log(`🔔 Métricas de ${wc.name} finalizadas com sucesso .`);
       } else {
         console.log(`ℹ️ Falha no apontamento das métricas de ${wc.name}.`);
       }

@@ -97,7 +97,7 @@ model Department {
 }
 
 model Downtime {
-  id                  String             @id
+  id                  String             @id @default(cuid())
   workCenterId        String
   stopCodeId          String?
   machineId           String?
@@ -106,7 +106,7 @@ model Downtime {
   endTime             DateTime?
   userId              String?
   createdAt           DateTime           @default(now())
-  updatedAt           DateTime
+  updatedAt           DateTime           @updatedAt
   deletedAt           DateTime?
   orderId             String?
   productionMetricsId String
@@ -121,19 +121,21 @@ model Downtime {
 }
 
 model IntervalDowntime {
-  id                  String            @id
+  id                  String            @id @default(cuid())
   downtimeId          String
   productionMetricsId String
   startTime           DateTime
   endTime             DateTime?
   durationSeconds     BigInt?
   createdAt           DateTime          @default(now())
-  updatedAt           DateTime
+  updatedAt           DateTime          @updatedAt
   deletedAt           DateTime?
   workCenterId        String
   Downtime            Downtime          @relation(fields: [downtimeId], references: [id])
   ProductionMetrics   ProductionMetrics @relation(fields: [productionMetricsId], references: [id])
   WorkCenter          WorkCenter        @relation(fields: [workCenterId], references: [id])
+
+  @@unique([downtimeId, productionMetricsId])
 }
 
 model Machine {
