@@ -6,6 +6,7 @@ export async function createDowntime(params: {
   workCenterId: string;
   orderId?: string | null;
   productionMetricsId: string;
+  shiftId: string;
   startTime: Date;
   endTime: Date;
 }): Promise<Downtime> {
@@ -14,11 +15,44 @@ export async function createDowntime(params: {
       workCenterId: params.workCenterId,
       orderId: params.orderId ?? null,
       productionMetricsId: params.productionMetricsId,
+      shiftId: params.shiftId,
       startTime: params.startTime,
       endTime: params.endTime,
     },
   });
 }
+
+// export async function upsertDowntime(params: {
+//   workCenterId: string;
+//   orderId?: string | null;
+//   productionMetricsId: string;
+//   shiftId: string;
+//   filterOrder: string;
+//   startTime: Date;
+//   endTime: Date;
+// }): Promise<Downtime> {
+//   return await prisma.downtime.upsert({
+//     where: {
+//       workCenterId_shiftId_filterOrder: {
+//         workCenterId: params.workCenterId,
+//         shiftId: params.shiftId,
+//         filterOrder: params.filterOrder,
+//       },
+//     },
+//     create: {
+//       workCenterId: params.workCenterId,
+//       orderId: params.orderId ?? null,
+//       productionMetricsId: params.productionMetricsId,
+//       shiftId: params.shiftId,
+//       filterOrder: params.filterOrder,
+//       startTime: params.startTime,
+//       endTime: params.endTime,
+//     },
+//     update: {
+//       endTime: params.endTime,
+//     },
+//   });
+// }
 
 export async function updateDowntime(params: {
   downtimeId: string;

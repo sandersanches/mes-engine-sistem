@@ -111,9 +111,11 @@ model Downtime {
   orderId             String?
   productionMetricsId String
   durationSeconds     BigInt?
+  shiftId             String
   Machine             Machine?           @relation(fields: [machineId], references: [id])
   Order               Order?             @relation(fields: [orderId], references: [id])
   ProductionMetrics   ProductionMetrics  @relation(fields: [productionMetricsId], references: [id])
+  Shift               Shift              @relation(fields: [shiftId], references: [id])
   StopCode            StopCode?          @relation(fields: [stopCodeId], references: [id])
   User                User?              @relation(fields: [userId], references: [id])
   WorkCenter          WorkCenter         @relation(fields: [workCenterId], references: [id])
@@ -381,6 +383,7 @@ model Shift {
   deletedAt         DateTime?
   startTime         DateTime            @db.Time(4)
   endTime           DateTime            @db.Time(4)
+  Downtime          Downtime[]
   ProductionMetrics ProductionMetrics[]
 }
 
@@ -489,6 +492,38 @@ model WorkCenter_user {
   WorkCenter   WorkCenter @relation(fields: [workCenterId], references: [id], onDelete: Cascade)
 
   @@id([workCenterId, userId])
+}
+
+model CounterState {
+  id           String   @id @default(cuid())
+  value        Int
+  timestamp    DateTime
+  updatedAt    DateTime @updatedAt
+  workcenterId String   @unique
+}
+
+model DowntimeState {
+  id                  String   @id @default(cuid())
+  downtimeId          String
+  intervalId          String
+  productionMetricsId String
+  startTime           DateTime
+  updatedAt           DateTime @updatedAt
+  workcenterId        String   @unique
+}
+
+model MetricState {
+  id           String   @id @default(cuid())
+  lastMetricId String?
+  updatedAt    DateTime @updatedAt
+  workcenterId String   @unique
+}
+
+model ProcessedState {
+  id            String    @id @default(cuid())
+  lastProcessed DateTime?
+  updatedAt     DateTime  @updatedAt
+  workcenterId  String    @unique
 }
 
 enum Action {

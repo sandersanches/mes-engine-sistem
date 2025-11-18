@@ -23,10 +23,13 @@ export interface InfluxPoint {
  * - sinceIso: ISO timestamp string. Se informado, busca a partir desse timestamp (inclusive).
  * - Caso não informado, busca uma janela curta (-1h) para evitar consumo excessivo.
  */
-export async function queryInfluxForWorkcenter(
-  workcenterName: string,
-  sinceIso?: string,
-): Promise<InfluxPoint[]> {
+export async function queryInfluxForWorkcenter({
+  workcenterName,
+  sinceIso,
+}: {
+  workcenterName: string;
+  sinceIso?: string;
+}): Promise<InfluxPoint[]> {
   // ✅ Corrigido: o Influx exige time(v: "...") em range()
   const rangeClause = sinceIso
     ? `|> range(start: time(v: "${sinceIso}"))`

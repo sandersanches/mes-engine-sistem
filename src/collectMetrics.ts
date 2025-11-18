@@ -4,7 +4,8 @@ import { fetchShifts } from "./services/shiftsService";
 import { fetchOrders } from "./services/ordersService";
 import { queryInfluxForWorkcenter } from "./services/metrics/influxService";
 import { processWorkcenter } from "./processWorkcenter";
-import { LastProcessedStore } from "./utils/lastProcessedStore";
+// import { LastProcessedStore } from "./utils/lastProcessedStore";
+import { ProcessedStateStore } from "./stores/processedStateStore";
 
 export async function collectMetrics() {
   console.log("🚀 Iniciando ciclo de coleta...");
@@ -14,7 +15,8 @@ export async function collectMetrics() {
   const shifts = await fetchShifts();
 
   // determinar janela de ordens: baseado no menor lastProcessed entre todos os WCs
-  const minIso = await LastProcessedStore.getMinTimestampIso();
+  // const minIso = await LastProcessedStore.getMinTimestampIso();
+  const minIso = await ProcessedStateStore.getMinTimestampIso();
 
   if (minIso) {
     console.log("Janela de ordens baseada no menor lastProcessed:", minIso);
@@ -24,17 +26,22 @@ export async function collectMetrics() {
     );
   }
 
-  const orders = await fetchOrders(); // fetchOrders usa LastProcessedStore internamente para janela
+  const orders = await fetchOrders({ minIso });
 
   for (const wc of workcenters) {
     try {
       // pega o lastProcessed específico deste WC para passar ao Influx
-      const lastForThis = await LastProcessedStore.get(wc.name); // pode ser null
+      // const lastForThis = await LastProcessedStore.get(wc.name); // pode ser null
+      const lastForThis = await ProcessedStateStore.get({
+        workcenterId: wc.id,
+      }); // pode ser Date ou null
 
-      const points = await queryInfluxForWorkcenter(
-        wc.name,
-        lastForThis ?? undefined,
-      );
+      const sinceIso = lastForThis ? lastForThis.toISOString() : undefined;
+
+      const points = await queryInfluxForWorkcenter({
+        workcenterName: wc.name,
+        sinceIso,
+      });
 
       if (points.length === 0) {
         console.log(`⏸️  ${wc.name}: nenhum ponto novo.`);

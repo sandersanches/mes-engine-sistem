@@ -45,6 +45,10 @@ const envSchema = z.object({
     .number()
     .min(10, "Tempo mínimo inválido")
     .default(30),
+  CACHE_TTL_SECONDS: z.coerce
+    .number()
+    .min(10, "Tempo mínimo inválido")
+    .default(30),
 });
 
 // Valida process.env
@@ -71,4 +75,5 @@ export const ENV = {
 
   METRICS_INTERVAL_SECONDS: parsed.data.METRICS_INTERVAL_SECONDS,
   DOWNTIME_THRESHOLD_SECONDS: parsed.data.DOWNTIME_THRESHOLD_SECONDS,
+  CACHE_TTL_SECONDS: parsed.data.CACHE_TTL_SECONDS,
 } as const;
