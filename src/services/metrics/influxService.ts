@@ -1,6 +1,7 @@
 // src/services/metrics/influxService.ts
 import { ENV } from "@/config/env";
 import { InfluxDB, QueryApi } from "@influxdata/influxdb-client";
+import logger from "../logger";
 
 const url = ENV.INFLUX_URL;
 const token = ENV.INFLUX_TOKEN;
@@ -32,7 +33,8 @@ export async function queryInfluxForWorkcenter({
 }): Promise<InfluxPoint[]> {
   // ✅ Corrigido: o Influx exige time(v: "...") em range()
   const rangeClause = sinceIso
-    ? `|> range(start: time(v: "${sinceIso}"))`
+    ? `|> range(start: time(v: "${sinceIso}"))
+     |> filter(fn: (r) => r._time > time(v: "${sinceIso}"))`
     : `|> range(start: -1h)`; // fallback
 
   const flux = `
@@ -57,7 +59,10 @@ export async function queryInfluxForWorkcenter({
         });
       },
       error(err) {
-        console.error(`❌ Erro ao consultar Influx (${workcenterName}):`, err);
+        logger.error(
+          { err },
+          `❌ Erro ao consultar Influx (${workcenterName})`,
+        );
         reject(err);
       },
       complete() {

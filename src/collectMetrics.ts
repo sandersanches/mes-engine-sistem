@@ -6,9 +6,10 @@ import { queryInfluxForWorkcenter } from "./services/metrics/influxService";
 import { processWorkcenter } from "./processWorkcenter";
 // import { LastProcessedStore } from "./utils/lastProcessedStore";
 import { ProcessedStateStore } from "./stores/processedStateStore";
+import logger from "./services/logger";
 
 export async function collectMetrics() {
-  console.log("🚀 Iniciando ciclo de coleta...");
+  logger.debug(" Iniciando ciclo de coleta...");
 
   // buscar workcenters e turnos (uma vez)
   const workcenters = await fetchWorkcenters();
@@ -19,10 +20,10 @@ export async function collectMetrics() {
   const minIso = await ProcessedStateStore.getMinTimestampIso();
 
   if (minIso) {
-    console.log("Janela de ordens baseada no menor lastProcessed:", minIso);
+    logger.debug(` Janela de ordens baseada no menor lastProcessed: ${minIso}`);
   } else {
-    console.log(
-      "Nenhum lastProcessed encontrado — janela de ordens = últimos 30 dias",
+    logger.debug(
+      " Nenhum lastProcessed encontrado — janela de ordens = ultimos 30 dias",
     );
   }
 
@@ -44,12 +45,12 @@ export async function collectMetrics() {
       });
 
       if (points.length === 0) {
-        console.log(`⏸️  ${wc.name}: nenhum ponto novo.`);
+        logger.debug(` ${wc.name}: nenhum ponto novo.`);
         continue;
       }
 
-      console.log(
-        `📈 ${wc.name}: ${points.length} pontos recebidos (${points[0].time} → ${points[points.length - 1].time})`,
+      logger.debug(
+        ` ${wc.name}: ${points.length} pontos recebidos (${points[0].time} --- ${points[points.length - 1].time})`,
       );
 
       const processedMetric = await processWorkcenter({
@@ -60,18 +61,18 @@ export async function collectMetrics() {
       });
 
       if (processedMetric.success) {
-        // console.log(`🔔 Métricas de ${wc.name} finalizadas com sucesso .`);
+        // logger.debug(`🔔 Métricas de ${wc.name} finalizadas com sucesso .`);
       } else {
-        console.log(`ℹ️ Falha no apontamento das métricas de ${wc.name}.`);
+        logger.debug(` Falha no apontamento das métricas de ${wc.name}.`);
       }
     } catch (err: unknown) {
       if (err instanceof Error) {
-        console.error(`❌ Erro no WC ${wc.name}:`, err.message);
+        logger.error({ err }, ` Erro no WC ${wc.name}`);
       } else {
-        console.error(`❌ Erro desconhecido no WC ${wc.name}`);
+        logger.error(` Erro desconhecido no WC ${wc.name}`);
       }
     }
   }
 
-  console.log("✅ Ciclo de coleta concluído.\n");
+  logger.debug(" Ciclo de coleta concluido.\n");
 }

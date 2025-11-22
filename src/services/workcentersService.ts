@@ -2,6 +2,7 @@
 import { ENV } from "@/config/env";
 import { prisma } from "../lib/prisma";
 import { WorkCenter, WorkCenterStatus } from "@prisma/client";
+import logger from "./logger";
 
 let cachedWorkcenters: WorkCenter[] | null = null;
 let lastFetchTime = 0;
@@ -24,9 +25,9 @@ export async function fetchWorkcenters(): Promise<WorkCenter[]> {
     return workcenters;
   } catch (err) {
     if (err instanceof Error) {
-      console.error("Erro ao buscar centros de trabalho:", err.message);
+      logger.error({ err }, "Erro ao buscar centros de trabalho");
     } else {
-      console.error("Erro desconhecido ao buscar centros de trabalho");
+      logger.error("Erro desconhecido ao buscar centros de trabalho");
     }
     return [];
   }
@@ -48,9 +49,9 @@ export async function updateWorkcenterStatus({
       data: { status },
     });
   } catch (err) {
-    console.error(
-      `❌ Erro ao atualizar status do workcenter ${workcenterId}:`,
-      err,
+    logger.error(
+      { err },
+      `❌ Erro ao atualizar status do workcenter ${workcenterId}`,
     );
   }
 }

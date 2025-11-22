@@ -2,6 +2,7 @@
 import { ENV } from "@/config/env";
 import { prisma } from "../lib/prisma";
 import { Shift } from "@prisma/client";
+import logger from "./logger";
 
 let cachedShifts: Shift[] | null = null;
 let lastFetchTime = 0;
@@ -19,9 +20,9 @@ export async function fetchShifts(): Promise<Shift[]> {
     return shifts;
   } catch (err) {
     if (err instanceof Error) {
-      console.error("Erro ao buscar turnos:", err.message);
+      logger.error({ err }, "Erro ao buscar turnos:");
     } else {
-      console.error("Erro desconhecido ao buscar turnos");
+      logger.error("Erro desconhecido ao buscar turnos");
     }
     return [];
   }

@@ -27,6 +27,7 @@ import {
   updateOrderFinalQuantity,
 } from "./services/ordersService";
 import { updateWorkcenterStatus } from "./services/workcentersService";
+import logger from "./services/logger";
 
 type ProcessWorkcenterProps = {
   workcenter: WorkCenter;
@@ -44,7 +45,7 @@ export async function processWorkcenter({
 }: ProcessWorkcenterProps): Promise<ProcessWorkcenterResult> {
   try {
     if (points.length === 0) {
-      console.log(`⏸️ ${workcenter.name}: nenhum ponto novo.`);
+      logger.debug(` ${workcenter.name}: nenhum ponto novo.`);
       return { success: true };
     }
 
@@ -64,12 +65,9 @@ export async function processWorkcenter({
         const lastValue = lastProcessedDate.getTime();
 
         if (tsValue === lastValue) {
-          // console.warn(
-          //   `OCULTAR: Ignorando ponto: timestamp igual a lastProcessedDate ${timestamp.toISOString()}`,
-          // );
           continue;
         } else if (tsValue < lastValue) {
-          console.warn(
+          logger.warn(
             `OCULTAR: Ignorando ponto: timestamp menor que lastProcessedDate ${timestamp.toISOString()} < ${lastProcessedDate.toISOString()}`,
           );
           continue;
@@ -79,12 +77,11 @@ export async function processWorkcenter({
       // 🔹 Turno ativo
       const shift = getActiveShift(timestamp, shifts);
       if (!shift) {
-        console.warn(
-          `❌ ${workcenter.name} Nenhum turno encontrado para ${point.time}`,
+        logger.warn(
+          ` ${workcenter.name} Nenhum turno encontrado para ${point.time}`,
         );
         continue;
       }
-      // console.log(`OCULTAR: Turno de ${timestamp}: ${shift.name}`);
 
       // 🔹 Ordem ativa ou em aberto
       const order = orders.find((o) => {
@@ -96,19 +93,17 @@ export async function processWorkcenter({
       });
 
       const filterOrder = order ? order.id : "no_order";
-      // console.log(`filterOrder: ${filterOrder} `);
 
       // 🔹  Atualização de ordem
       if (order) {
         if (!order.conterStarted) {
           await startOrderCounter({ orderId: order.id, quantity: point.value });
-          console.log(`🚀 Ordem ${order.id}: contagem iniciada`);
+          logger.debug(` Ordem ${order.id}: contagem iniciada`);
         } else {
           await updateOrderFinalQuantity({
             orderId: order.id,
             finalQuantity: point.value,
           });
-          // console.log(`🚀 Ordem ${order.id}: Atualizada`);
         }
       }
 
@@ -120,9 +115,8 @@ export async function processWorkcenter({
       const lastMetric = await MetricStateStore.get({
         workcenterId: workcenter.id,
       });
-      // console.log(`LastMetric de ${workcenter.name} : ${lastMetric?.id} `);
 
-      // 🔹 Cria ou atualiza métrica de produção
+      // 🔹 Cria ou atualiza metrica de produção
       const metric = await upsertProductionMetric({
         hour,
         workCenterId: workcenter.id,
@@ -135,24 +129,24 @@ export async function processWorkcenter({
         finalTime: timestamp,
       });
       if (!metric.productionMetric || !metric.success) {
-        console.log("erro ao criar ou atualizar métricas");
+        logger.debug("erro ao criar ou atualizar metricas");
         continue;
       }
 
       try {
-        // 🔹 Atualiza metrica anterior, se a o id da metrica atual for diferente do id da métrica anterior
+        // 🔹 Atualiza metrica anterior, se a o id da metrica atual for diferente do id da metrica anterior
         // if (lastMetric && lastMetric !== metric.productionMetric.id) {
         //   await updateProductionMetric({
         //     id: lastMetric,
         //     finalQuantity: point.value,
         //     finalTime: timestamp,
         //   });
-        //   console.log(
-        //     `✅ ${workcenter.name}: Métrica anterior atualizada e nova métrica registrada`,
+        //   logger.debug(
+        //     `✅ ${workcenter.name}: Metrica anterior atualizada e nova metrica registrada`,
         //   );
         // } else {
-        //   console.log(
-        //     `✅ ${workcenter.name}: Métrica atualizada - Quantidade Final: ${metric.productionMetric.finalQuantity}`,
+        //   logger.debug(
+        //     `✅ ${workcenter.name}: Metrica atualizada - Quantidade Final: ${metric.productionMetric.finalQuantity}`,
         //   );
         // }
 
@@ -161,8 +155,8 @@ export async function processWorkcenter({
         // });
 
         if (lastMetric && lastMetric === metric.productionMetric.id) {
-          console.log(
-            `✅ ${workcenter.name}: Métrica atualizada - Quantidade Final: ${metric.productionMetric.finalQuantity}`,
+          logger.debug(
+            ` ${workcenter.name}: Metrica atualizada - Quantidade Final: ${metric.productionMetric.finalQuantity}`,
           );
         } else {
           await MetricStateStore.set({
@@ -176,16 +170,22 @@ export async function processWorkcenter({
               finalQuantity: point.value,
               finalTime: timestamp,
             });
-            console.log(
-              `✅ ${workcenter.name}: Métrica anterior atualizada e nova métrica registrada`,
+            logger.debug(
+              ` ${workcenter.name}: Metrica anterior atualizada e nova metrica registrada`,
             );
           }
         }
-      } catch (error) {
-        console.error(
-          `❌ ${workcenter.name}: Erro ao atualizar última métrica`,
-          error instanceof Error ? error.message : error,
-        );
+      } catch (err) {
+        if (err instanceof Error) {
+          logger.error(
+            { err },
+            ` ${workcenter.name}: Erro ao atualizar ultima metrica`,
+          );
+        } else {
+          logger.error(
+            `${workcenter.name}: Erro desconhecido ao atualizar ultima metrica`,
+          );
+        }
       }
 
       // 🔹 Recupera o último valor registrado do contador
@@ -193,17 +193,11 @@ export async function processWorkcenter({
       const lastCounter = await CounterStateStore.get({
         workcenterId: workcenter.id,
       });
-      // console.log(
-      //   `lastCounter de ${workcenter.name} : ( timestamp:${lastCounter?.timestamp} value: ${lastCounter?.value}`,
-      // );
 
       // const lastDowntime = await LastDowntimeStore.get(workcenter.name);
       const lastDowntime = await DowntimeStateStore.get({
         workcenterId: workcenter.id,
       });
-      // console.log(
-      //   `lastDowntime de ${workcenter.name} : ${lastDowntime?.downtimeId}`,
-      // );
 
       // if (!lastCounter) {
       //   // Primeira vez: grava o contador atual
@@ -292,8 +286,8 @@ export async function processWorkcenter({
             endTime: timestamp,
             shiftId: shift.id,
           });
-          console.log(
-            `⚠️  ${workcenter.name}: Nova Parada Criada - Inicio: ${downtime.startTime} - Fim: ${downtime.endTime}`,
+          logger.debug(
+            ` ${workcenter.name}: Nova Parada Criada - Inicio: ${downtime.startTime} - Fim: ${downtime.endTime}`,
           );
 
           const interval = await createIntervalDowntime({
@@ -302,8 +296,8 @@ export async function processWorkcenter({
             startTime: new Date(lastCounter.timestamp),
             endTime: timestamp,
           });
-          console.log(
-            `⚠️  ${workcenter.name}: Nova Intervalo de parada Criado - Inicio: ${interval.startTime} - Fim: ${interval.endTime}`,
+          logger.debug(
+            `  ${workcenter.name}: Nova Intervalo de parada Criado - Inicio: ${interval.startTime} - Fim: ${interval.endTime}`,
           );
 
           // await LastDowntimeStore.set(workcenter.name, {
@@ -327,7 +321,7 @@ export async function processWorkcenter({
             downtimeId: lastDowntime.downtimeId,
             endTime: timestamp,
           });
-          console.log(
+          logger.debug(
             `⚠️  ${workcenter.name}: Parada atualizada:  Inicio: ${updatedDowntime.startTime} - Fim: ${updatedDowntime.endTime} `,
           );
 
@@ -350,7 +344,7 @@ export async function processWorkcenter({
             metrics: metric.productionMetric,
             timestamp: timestamp,
           });
-          console.log(
+          logger.debug(
             `⚠️  ${workcenter.name}: Intervalo de parada de atualizado - Inicio: ${intervalUpserted.startTime} - Fim: ${intervalUpserted.endTime}`,
           );
 
@@ -361,7 +355,7 @@ export async function processWorkcenter({
               id: lastDowntime.intervalId,
               endTime: timestamp,
             });
-            console.log(
+            logger.debug(
               `⚠️  ${workcenter.name}: Intervalo de parada Antigo atualizado: - Inicio: ${intervalUpdated.startTime} - Fim: ${intervalUpdated.endTime}`,
             );
 
@@ -393,13 +387,13 @@ export async function processWorkcenter({
     return { success: true };
   } catch (err: unknown) {
     if (err instanceof Error) {
-      console.error(
-        `❌ Erro ao Processar Workcenter: ${workcenter.name}: `,
-        err.message,
+      logger.error(
+        { err },
+        ` Erro ao Processar Workcenter: ${workcenter.name}: `,
       );
     } else {
-      console.error(
-        `❌ Erro desconhecido ao Processar Workcenter: ${workcenter.name}`,
+      logger.error(
+        ` Erro desconhecido ao Processar Workcenter: ${workcenter.name}`,
       );
     }
     return { success: false };

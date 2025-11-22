@@ -2,6 +2,7 @@
 import { prisma } from "../lib/prisma";
 // import { LastProcessedStore } from "../utils/lastProcessedStore";
 import { Order } from "@prisma/client";
+import logger from "./logger";
 
 /**
  * Busca ordens relevantes para o processamento de métricas.
@@ -27,8 +28,8 @@ export async function fetchOrders({
 
     const now = new Date();
 
-    console.log(
-      `📋 Buscando ordens iniciadas até ${now.toISOString()}, com endDate >= ${windowStart.toISOString()} ou ainda abertas`,
+    logger.debug(
+      ` Buscando ordens iniciadas até ${now.toISOString()}, com endDate >= ${windowStart.toISOString()} ou ainda abertas`,
     );
 
     const orders = await prisma.order.findMany({
@@ -46,9 +47,9 @@ export async function fetchOrders({
     return orders;
   } catch (err: unknown) {
     if (err instanceof Error) {
-      console.error("❌ Erro ao buscar ordens:", err.message);
+      logger.error({ err }, "❌ Erro ao buscar ordens:");
     } else {
-      console.error("❌ Erro desconhecido ao buscar ordens");
+      logger.error("❌ Erro desconhecido ao buscar ordens");
     }
     return [];
   }
@@ -70,9 +71,9 @@ export async function updateOrderFinalQuantity({
       data: { finalQuantity },
     });
   } catch (err) {
-    console.error(
+    logger.error(
+      { err },
       `❌ Erro ao atualizar finalQuantity da ordem ${orderId}:`,
-      err,
     );
   }
 }
@@ -98,6 +99,6 @@ export async function startOrderCounter({
       },
     });
   } catch (err) {
-    console.error(`❌ Erro ao iniciar contagem da ordem ${orderId}:`, err);
+    logger.error({ err }, `❌ Erro ao iniciar contagem da ordem ${orderId}`);
   }
 }

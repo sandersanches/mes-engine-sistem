@@ -1,6 +1,7 @@
 // src/services/productionMetricsService.ts
 import { ProductionMetrics } from "@prisma/client";
 import { prisma } from "../lib/prisma";
+import logger from "./logger";
 
 type upsertProductionMetricsProps = {
   hour: Date;
@@ -54,14 +55,9 @@ export async function upsertProductionMetric({
     return { success: true, productionMetric };
   } catch (err) {
     if (err instanceof Error) {
-      console.error(
-        "Erro ao criar ou atualizar productionMetrics:",
-        err.message,
-      );
+      logger.error({ err }, "Erro ao criar ou atualizar productionMetrics:");
     } else {
-      console.error(
-        "Erro desconhecido ao criar ou atualizar productionMetrics",
-      );
+      logger.error("Erro desconhecido ao criar ou atualizar productionMetrics");
     }
     return { success: false };
   }
