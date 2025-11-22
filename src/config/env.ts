@@ -1,4 +1,5 @@
 //src\config\env.ts
+import logger from "@/services/logger";
 import dotenv from "dotenv";
 import { z } from "zod";
 
@@ -55,7 +56,7 @@ const envSchema = z.object({
 const parsed = envSchema.safeParse(process.env);
 
 if (!parsed.success) {
-  console.error("❌ Invalid environment variables:");
+  logger.error(" Invalid environment variables:");
   console.error(parsed.error.format());
   throw new Error("Invalid environment variables. See logs above.");
 }
