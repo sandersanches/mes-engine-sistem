@@ -68,7 +68,7 @@ export async function processWorkcenter({
           continue;
         } else if (tsValue < lastValue) {
           logger.warn(
-            `OCULTAR: Ignorando ponto: timestamp menor que lastProcessedDate ${timestamp.toISOString()} < ${lastProcessedDate.toISOString()}`,
+            `Ignorando ponto: timestamp menor que lastProcessedDate ${timestamp.toISOString()} < ${lastProcessedDate.toISOString()}`,
           );
           continue;
         }
@@ -189,12 +189,10 @@ export async function processWorkcenter({
       }
 
       // 🔹 Recupera o último valor registrado do contador
-      // const lastCounter = await LastCounterStore.get(workcenter.name);
       const lastCounter = await CounterStateStore.get({
         workcenterId: workcenter.id,
       });
 
-      // const lastDowntime = await LastDowntimeStore.get(workcenter.name);
       const lastDowntime = await DowntimeStateStore.get({
         workcenterId: workcenter.id,
       });
@@ -254,10 +252,6 @@ export async function processWorkcenter({
 
       // 🔹 Caso contador aumente → atualiza lastCounter e encerra downtime (se houver)
       if (point.value > lastCounter.value) {
-        // await LastCounterStore.set(workcenter.name, {
-        //   value: point.value,
-        //   timestamp: timestamp.toISOString(),
-        // });
         await CounterStateStore.set({
           workcenterId: workcenter.id,
           value: point.value,
@@ -322,7 +316,7 @@ export async function processWorkcenter({
             endTime: timestamp,
           });
           logger.debug(
-            `⚠️  ${workcenter.name}: Parada atualizada:  Inicio: ${updatedDowntime.startTime} - Fim: ${updatedDowntime.endTime} `,
+            ` ${workcenter.name}: Parada atualizada:  Inicio: ${updatedDowntime.startTime} - Fim: ${updatedDowntime.endTime} `,
           );
 
           if (
@@ -345,7 +339,7 @@ export async function processWorkcenter({
             timestamp: timestamp,
           });
           logger.debug(
-            `⚠️  ${workcenter.name}: Intervalo de parada de atualizado - Inicio: ${intervalUpserted.startTime} - Fim: ${intervalUpserted.endTime}`,
+            ` ${workcenter.name}: Intervalo de parada de atualizado - Inicio: ${intervalUpserted.startTime} - Fim: ${intervalUpserted.endTime}`,
           );
 
           // Caso a interval.id mude, atualiza ultimo intervalo e arquivo
@@ -356,7 +350,7 @@ export async function processWorkcenter({
               endTime: timestamp,
             });
             logger.debug(
-              `⚠️  ${workcenter.name}: Intervalo de parada Antigo atualizado: - Inicio: ${intervalUpdated.startTime} - Fim: ${intervalUpdated.endTime}`,
+              ` ${workcenter.name}: Intervalo de parada Antigo atualizado: - Inicio: ${intervalUpdated.startTime} - Fim: ${intervalUpdated.endTime}`,
             );
 
             // await LastDowntimeStore.set(workcenter.name, {
