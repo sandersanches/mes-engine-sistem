@@ -14,10 +14,6 @@ import {
   createIntervalDowntime,
 } from "./services/downtimeService";
 import { ENV } from "./config/env";
-// import { LastProcessedStore } from "./utils/lastProcessedStore";
-// import { LastMetricStore } from "./utils/lastMetricStore";
-// import { LastCounterStore } from "./utils/lastCounterStore";
-// import { LastDowntimeStore } from "./utils/lastDowntimeStore";
 import { ProcessedStateStore } from "./stores/processedStateStore";
 import { MetricStateStore } from "./stores/metricStateStore";
 import { CounterStateStore } from "./stores/counterStateStore";
@@ -37,6 +33,16 @@ type ProcessWorkcenterProps = {
 };
 type ProcessWorkcenterResult = { success: boolean };
 
+function diffSeconds({
+  timestamp,
+  lastCounterDate,
+}: {
+  timestamp: Date;
+  lastCounterDate: Date;
+}) {
+  return (timestamp.getTime() - new Date(lastCounterDate).getTime()) / 1000;
+}
+
 export async function processWorkcenter({
   workcenter,
   points,
@@ -50,7 +56,6 @@ export async function processWorkcenter({
     }
 
     // 🔹 Recupera o último timestamp processado para garantir ordenação temporal
-    // const lastProcessed = await LastProcessedStore.get(workcenter.name);
     const lastProcessed = await ProcessedStateStore.get({
       workcenterId: workcenter.id,
     });
@@ -94,11 +99,19 @@ export async function processWorkcenter({
 
       const filterOrder = order ? order.id : "no_order";
 
+      let lastCounter;
+
       // 🔹  Atualização de ordem
       if (order) {
         if (!order.conterStarted) {
           await startOrderCounter({ orderId: order.id, quantity: point.value });
           logger.debug(` Ordem ${order.id}: contagem iniciada`);
+
+          lastCounter = await CounterStateStore.set({
+            workcenterId: workcenter.id,
+            value: point.value,
+            timestamp: timestamp,
+          });
         } else {
           await updateOrderFinalQuantity({
             orderId: order.id,
@@ -111,7 +124,6 @@ export async function processWorkcenter({
       const hour = new Date(timestamp);
       hour.setMinutes(0, 0, 0);
 
-      // const lastMetric = await LastMetricStore.get(workcenter.name);
       const lastMetric = await MetricStateStore.get({
         workcenterId: workcenter.id,
       });
@@ -134,26 +146,7 @@ export async function processWorkcenter({
       }
 
       try {
-        // 🔹 Atualiza metrica anterior, se a o id da metrica atual for diferente do id da metrica anterior
-        // if (lastMetric && lastMetric !== metric.productionMetric.id) {
-        //   await updateProductionMetric({
-        //     id: lastMetric,
-        //     finalQuantity: point.value,
-        //     finalTime: timestamp,
-        //   });
-        //   logger.debug(
-        //     `✅ ${workcenter.name}: Metrica anterior atualizada e nova metrica registrada`,
-        //   );
-        // } else {
-        //   logger.debug(
-        //     `✅ ${workcenter.name}: Metrica atualizada - Quantidade Final: ${metric.productionMetric.finalQuantity}`,
-        //   );
-        // }
-
-        // await LastMetricStore.set(workcenter.name, {
-        //   id: metric.productionMetric.id,
-        // });
-
+        // Lógica para atualizar métrica anterior
         if (lastMetric && lastMetric === metric.productionMetric.id) {
           logger.debug(
             ` ${workcenter.name}: Metrica atualizada - Quantidade Final: ${metric.productionMetric.finalQuantity}`,
@@ -189,22 +182,14 @@ export async function processWorkcenter({
       }
 
       // 🔹 Recupera o último valor registrado do contador
-      const lastCounter = await CounterStateStore.get({
+      lastCounter = await CounterStateStore.get({
         workcenterId: workcenter.id,
       });
 
-      const lastDowntime = await DowntimeStateStore.get({
+      let lastDowntime = await DowntimeStateStore.get({
         workcenterId: workcenter.id,
       });
 
-      // if (!lastCounter) {
-      //   // Primeira vez: grava o contador atual
-      //   await LastCounterStore.set(workcenter.name, {
-      //     value: point.value,
-      //     timestamp: timestamp.toISOString(),
-      //   });
-      //   continue;
-      // }
       if (!lastCounter) {
         // Primeira vez: grava o contador atual
         await CounterStateStore.set({
@@ -215,11 +200,15 @@ export async function processWorkcenter({
         continue;
       }
 
-      const diffSeconds =
-        (timestamp.getTime() - new Date(lastCounter.timestamp).getTime()) /
-        1000;
+      // const diffSeconds =
+      //   (timestamp.getTime() - new Date(lastCounter.timestamp).getTime()) /
+      //   1000;
 
       // 🔹 Atualização do status do WorkCenter
+
+      // ########################################################
+      // 🥇 Lógica de WorkCenter Sem Programação (NO_PROGRAM)
+      // ########################################################
       if (!order) {
         if (workcenter.status !== WorkCenterStatus.NO_PROGRAM) {
           await updateWorkcenterStatus({
@@ -227,49 +216,244 @@ export async function processWorkcenter({
             status: WorkCenterStatus.NO_PROGRAM,
           });
         }
-      } else if (
-        point.value === lastCounter.value &&
-        diffSeconds >= ENV.DOWNTIME_THRESHOLD_SECONDS
-      ) {
-        if (workcenter.status !== WorkCenterStatus.STOPPED) {
-          await updateWorkcenterStatus({
+        // Se NÃO houver ordem no momento, mas houver uma parada aberta (lastDowntime)
+        // E essa parada aberta FOI associada a uma ordem (lastDowntime.orderId não é null),
+        // precisamos encerrá-la antes de iniciar uma NO_PROGRAM.
+        if (lastDowntime && lastDowntime.orderId) {
+          // 1. Encerra a parada STOPPED (que estava aberta)
+          await updateDowntime({
+            downtimeId: lastDowntime.downtimeId,
+            endTime: timestamp,
+          });
+          await updateIntervalDowntime({
+            id: lastDowntime.intervalId,
+            endTime: timestamp,
+          });
+
+          // 2. Limpa o estado para que o próximo bloco (NO_PROGRAM) crie um novo.
+          lastDowntime = await DowntimeStateStore.delete({
             workcenterId: workcenter.id,
-            status: WorkCenterStatus.STOPPED,
+          });
+
+          // Atualiza o lastCounter para o timestamp atual antes de iniciar o novo downtime NO_PROGRAM
+          lastCounter = await CounterStateStore.set({
+            workcenterId: workcenter.id,
+            value: point.value,
+            timestamp: timestamp,
           });
         }
-      } else if (
-        point.value > lastCounter?.value ||
-        (point.value === lastCounter?.value &&
-          diffSeconds < ENV.DOWNTIME_THRESHOLD_SECONDS)
+
+        if (!lastDowntime) {
+          // ➕ Cria nova parada NO_PROGRAM.
+          const downtime = await createDowntime({
+            workCenterId: workcenter.id,
+            orderId: null,
+            productionMetricsId: metric.productionMetric.id,
+            startTime: timestamp,
+            endTime: timestamp,
+            shiftId: shift.id,
+          });
+          logger.debug(
+            ` ${workcenter.name}: Nova Parada NO_PROGRAM Criada - Inicio: ${downtime.startTime} - Fim: ${downtime.endTime}`,
+          );
+          // Cria um novo intervalo de parada NO_PROGRAM.
+          const interval = await createIntervalDowntime({
+            downtimeId: downtime.id,
+            metrics: metric.productionMetric,
+            startTime: timestamp,
+            endTime: timestamp,
+          });
+          logger.debug(
+            ` ${workcenter.name}: Novo Intervalo de parada NO_PROGRAM Criado`,
+          );
+
+          // Atualiza Registro de última Parada
+          await DowntimeStateStore.set({
+            workcenterId: workcenter.id,
+            data: {
+              downtimeId: downtime.id,
+              intervalId: interval.id,
+              productionMetricsId: metric.productionMetric.id,
+              startTime: timestamp,
+              orderId: null,
+            },
+          });
+        } else {
+          // 🔄 Parada NO_PROGRAM já aberta → atualizar parada
+          let updatedDowntime = await updateDowntime({
+            downtimeId: lastDowntime.downtimeId,
+            endTime: timestamp,
+          });
+          logger.debug(` ${workcenter.name}: Parada NO_PROGRAM atualizada `);
+
+          //Se o turno não mudou
+          if (updatedDowntime.shiftId === shift.id) {
+            // Atualiza Intervalo
+            const intervalUpserted = await upsertIntervalDowntime({
+              downtimeId: updatedDowntime.id,
+              metrics: metric.productionMetric,
+              timestamp: timestamp,
+            });
+
+            // Caso o id do interval mude, atualiza o anterior e o estado
+            if (intervalUpserted.id !== lastDowntime.intervalId) {
+              await updateIntervalDowntime({
+                id: lastDowntime.intervalId,
+                endTime: timestamp,
+              });
+              await DowntimeStateStore.set({
+                workcenterId: workcenter.id,
+                data: {
+                  downtimeId: updatedDowntime.id,
+                  intervalId: intervalUpserted.id,
+                  productionMetricsId: metric.productionMetric.id,
+                  startTime: lastDowntime.startTime,
+                  orderId: null,
+                },
+              });
+            }
+          }
+          // Se o turno mudou
+          else {
+            // Atualiza o intervalo da parada do turno anterior
+            let updatedIntervalDowntime = await updateIntervalDowntime({
+              id: lastDowntime.intervalId,
+              endTime: timestamp,
+            });
+            logger.debug(
+              ` ${workcenter.name}: Intervalo de Parada NO_PROGRAM atualizada:  Inicio: ${updatedIntervalDowntime.startTime} - Fim: ${updatedIntervalDowntime.endTime} `,
+            );
+
+            //Cria nova Parada
+            const newDowntime = await createDowntime({
+              workCenterId: workcenter.id,
+              orderId: null,
+              productionMetricsId: metric.productionMetric.id,
+              startTime: timestamp, // Novo turno, novo start time
+              endTime: timestamp,
+              shiftId: shift.id,
+            });
+
+            //Cria novo Intervalo de Parada
+            const newInterval = await createIntervalDowntime({
+              downtimeId: updatedDowntime.id,
+              metrics: metric.productionMetric,
+              startTime: timestamp,
+              endTime: timestamp,
+            });
+
+            // Atualiza estado
+            await DowntimeStateStore.set({
+              workcenterId: workcenter.id,
+              data: {
+                downtimeId: newDowntime.id,
+                intervalId: newInterval.id,
+                productionMetricsId: metric.productionMetric.id,
+                startTime: timestamp,
+                orderId: null,
+              },
+            });
+
+            logger.debug(
+              ` ${workcenter.name}: Nova Parada NO_PROGRAM Criada após mudança de turno.`,
+            );
+          }
+        }
+      }
+
+      // ########################################################
+      // 🥈 Lógica de Encerramento de Downtime NO_PROGRAM
+      // ########################################################
+
+      if (
+        order &&
+        lastDowntime &&
+        workcenter.status === WorkCenterStatus.NO_PROGRAM
       ) {
+        // Encerra a parada NO_PROGRAM (que estava aberta)
+        await updateDowntime({
+          downtimeId: lastDowntime.downtimeId,
+          endTime: timestamp, // Encerra no timestamp antes da produção
+        });
+
+        await updateIntervalDowntime({
+          id: lastDowntime.intervalId,
+          endTime: timestamp,
+        });
+
+        lastDowntime = await DowntimeStateStore.delete({
+          workcenterId: workcenter.id,
+        });
+        logger.debug(
+          ` ${workcenter.name}: Parada NO_PROGRAM encerrada pelo início da Ordem ${order.id}.`,
+        );
+
+        lastCounter = await CounterStateStore.set({
+          workcenterId: workcenter.id,
+          value: point.value,
+          timestamp: timestamp,
+        });
+      }
+
+      // ########################################################
+      // 🥉 Lógica de WorkCenter em Produção (PRODUCTION)
+      // ########################################################
+
+      if (
+        order &&
+        (point.value > lastCounter.value ||
+          (point.value === lastCounter?.value &&
+            diffSeconds({ timestamp, lastCounterDate: lastCounter.timestamp }) <
+              ENV.DOWNTIME_THRESHOLD_SECONDS))
+      ) {
+        // 🔹 Atualiza status para PRODUCTION
         if (workcenter.status !== WorkCenterStatus.PRODUCTION) {
           await updateWorkcenterStatus({
             workcenterId: workcenter.id,
             status: WorkCenterStatus.PRODUCTION,
           });
         }
-      }
 
-      // 🔹 Caso contador aumente → atualiza lastCounter e encerra downtime (se houver)
-      if (point.value > lastCounter.value) {
-        await CounterStateStore.set({
-          workcenterId: workcenter.id,
-          value: point.value,
-          timestamp: timestamp,
-        });
+        // 🔹 Caso contador aumente → atualiza lastCounter e encerra downtime (STOPPED, se houver)
+        if (point.value > lastCounter.value) {
+          lastCounter = await CounterStateStore.set({
+            workcenterId: workcenter.id,
+            value: point.value,
+            timestamp: timestamp,
+          });
 
-        if (lastDowntime) {
-          await DowntimeStateStore.delete({ workcenterId: workcenter.id });
+          // Encerra downtime STOPPED
+          if (lastDowntime && workcenter.status === WorkCenterStatus.STOPPED) {
+            await DowntimeStateStore.delete({ workcenterId: workcenter.id });
+            logger.debug(
+              ` ${workcenter.name}: Parada STOPPED encerrada pelo aumento de contador.`,
+            );
+          }
         }
-        continue;
       }
 
-      // 🔹 Caso contador esteja parado
+      // ###########################################################
+      // 🏅 Lógica de WorkCenter Parado (STOPPED) - APENAS COM ORDEM
+      // ###########################################################
+
       if (
+        order &&
         point.value === lastCounter.value &&
-        diffSeconds >= ENV.DOWNTIME_THRESHOLD_SECONDS
+        diffSeconds({ timestamp, lastCounterDate: lastCounter.timestamp }) >=
+          ENV.DOWNTIME_THRESHOLD_SECONDS
       ) {
-        // Já há uma parada aberta?
+        // 🔹 Atualiza status para STOPPED
+        if (workcenter.status !== WorkCenterStatus.STOPPED) {
+          await updateWorkcenterStatus({
+            workcenterId: workcenter.id,
+            status: WorkCenterStatus.STOPPED,
+          });
+        }
+        // 🔹 Gerenciamento de Downtime STOPPED
+
+        //  #############################
+        // 🔹 Quando não há parada criada
+        //  #############################
         if (!lastDowntime) {
           // ➕ Cria nova parada quando não há parada ja criada
           const downtime = await createDowntime({
@@ -280,9 +464,7 @@ export async function processWorkcenter({
             endTime: timestamp,
             shiftId: shift.id,
           });
-          logger.debug(
-            ` ${workcenter.name}: Nova Parada Criada - Inicio: ${downtime.startTime} - Fim: ${downtime.endTime}`,
-          );
+          logger.debug(` ${workcenter.name}: Nova Parada Criada.`);
 
           const interval = await createIntervalDowntime({
             downtimeId: downtime.id,
@@ -290,16 +472,8 @@ export async function processWorkcenter({
             startTime: new Date(lastCounter.timestamp),
             endTime: timestamp,
           });
-          logger.debug(
-            `  ${workcenter.name}: Nova Intervalo de parada Criado - Inicio: ${interval.startTime} - Fim: ${interval.endTime}`,
-          );
+          logger.debug(`  ${workcenter.name}: Nova Intervalo de parada Criado`);
 
-          // await LastDowntimeStore.set(workcenter.name, {
-          //   downtimeId: downtime.id,
-          //   intervalId: interval.id,
-          //   productionMetricsId: metric.productionMetric.id,
-          //   startTime: lastCounter.timestamp,
-          // });
           await DowntimeStateStore.set({
             workcenterId: workcenter.id,
             data: {
@@ -307,21 +481,26 @@ export async function processWorkcenter({
               intervalId: interval.id,
               productionMetricsId: metric.productionMetric.id,
               startTime: lastCounter.timestamp,
+              orderId: order.id,
             },
           });
-        } else {
-          // 🔄 Parada já aberta → atualizar parada
+        }
+
+        //  #############################
+        // 🔹 Quando há parada criada
+        //  #############################
+        else if (lastDowntime) {
+          // 🔄 Parada STOPPED já aberta → atualizar parada
           let updatedDowntime = await updateDowntime({
             downtimeId: lastDowntime.downtimeId,
             endTime: timestamp,
           });
-          logger.debug(
-            ` ${workcenter.name}: Parada atualizada:  Inicio: ${updatedDowntime.startTime} - Fim: ${updatedDowntime.endTime} `,
-          );
+          logger.debug(` ${workcenter.name}: Parada STOPPED atualizada`);
 
+          // Cria nova parada se o turno mudou ou a ordem mudou (dentro do estado STOPPED)
           if (
             updatedDowntime.shiftId !== shift.id ||
-            updatedDowntime.orderId !== (order ? order.id : null)
+            updatedDowntime.orderId !== order.id
           ) {
             updatedDowntime = await createDowntime({
               workCenterId: workcenter.id,
@@ -339,25 +518,20 @@ export async function processWorkcenter({
             timestamp: timestamp,
           });
           logger.debug(
-            ` ${workcenter.name}: Intervalo de parada de atualizado - Inicio: ${intervalUpserted.startTime} - Fim: ${intervalUpserted.endTime}`,
+            ` ${workcenter.name}: Intervalo de parada STOPPED de atualizado`,
           );
 
           // Caso a interval.id mude, atualiza ultimo intervalo e arquivo
           if (intervalUpserted.id !== lastDowntime.intervalId) {
             // Atualiza EndTime do intervalo com id Anterior
-            const intervalUpdated = await updateIntervalDowntime({
+            await updateIntervalDowntime({
               id: lastDowntime.intervalId,
               endTime: timestamp,
             });
             logger.debug(
-              ` ${workcenter.name}: Intervalo de parada Antigo atualizado: - Inicio: ${intervalUpdated.startTime} - Fim: ${intervalUpdated.endTime}`,
+              ` ${workcenter.name}: Intervalo de parada STOPPED Antigo atualizado`,
             );
 
-            // await LastDowntimeStore.set(workcenter.name, {
-            //   ...lastDowntime,
-            //   intervalId: intervalUpserted.id,
-            //   productionMetricsId: metric.productionMetric.id,
-            // });
             await DowntimeStateStore.set({
               workcenterId: workcenter.id,
               data: {
@@ -365,11 +539,15 @@ export async function processWorkcenter({
                 intervalId: intervalUpserted.id,
                 productionMetricsId: metric.productionMetric.id,
                 startTime: lastCounter.timestamp,
+                orderId: order.id,
               },
             });
           }
         }
       }
+
+      // --- 🛑 FIM DA NOVA LÓGICA DE STATUS E DOWNTIME ---
+
       lastProcessedDate = timestamp;
     }
 

@@ -14,7 +14,7 @@ export const CounterStateStore = {
     value: number;
     timestamp: Date;
   }) {
-    await prisma.counterState.upsert({
+    return await prisma.counterState.upsert({
       where: { workcenterId },
       update: { value, timestamp },
       create: { workcenterId, value, timestamp },

@@ -30,6 +30,11 @@ export async function collectMetrics() {
   const orders = await fetchOrders({ minIso });
 
   for (const wc of workcenters) {
+    logger.debug(
+      ` ########################################################
+        Processando dados de ${wc.name}
+        Status: ${wc.status}`,
+    );
     try {
       // pega o lastProcessed específico deste WC para passar ao Influx
       // const lastForThis = await LastProcessedStore.get(wc.name); // pode ser null
@@ -50,7 +55,8 @@ export async function collectMetrics() {
       }
 
       logger.debug(
-        ` ${wc.name}: ${points.length} pontos recebidos (${points[0].time} --- ${points[points.length - 1].time})`,
+        // ` ${wc.name}: ${points.length} pontos recebidos (${points[0].time} --- ${points[points.length - 1].time})`,
+        ` ${wc.name}: ${points.length} pontos recebidos`,
       );
 
       const processedMetric = await processWorkcenter({

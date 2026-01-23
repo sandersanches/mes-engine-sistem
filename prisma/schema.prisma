@@ -58,12 +58,13 @@ model Authenticator {
 }
 
 model Company {
-  id        String    @id
-  name      String
-  cnpj      String
-  createdAt DateTime  @default(now())
-  updatedAt DateTime
-  deletedAt DateTime?
+  id              String            @id
+  name            String
+  cnpj            String
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime
+  deletedAt       DateTime?
+  ProcessVariable ProcessVariable[]
 }
 
 model ConformityAnalysisResult {
@@ -88,12 +89,13 @@ model ConformityAnalysisResult {
 }
 
 model Department {
-  id         String       @id
-  name       String
-  createdAt  DateTime     @default(now())
-  updatedAt  DateTime
-  deletedAt  DateTime?
-  WorkCenter WorkCenter[]
+  id              String            @id
+  name            String
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime
+  deletedAt       DateTime?
+  ProcessVariable ProcessVariable[]
+  WorkCenter      WorkCenter[]
 }
 
 model Downtime {
@@ -152,6 +154,7 @@ model Machine {
   ConformityAnalysisResult ConformityAnalysisResult[]
   Downtime                 Downtime[]
   WorkCenter               WorkCenter?                @relation(fields: [workCenterId], references: [id])
+  ProcessVariable          ProcessVariable[]
   RangeAnalysisResult      RangeAnalysisResult[]
   Rejection                Rejection[]
 }
@@ -460,6 +463,7 @@ model WorkCenter {
   IntervalDowntime   IntervalDowntime[]
   Machine            Machine[]
   Order              Order[]
+  ProcessVariable    ProcessVariable[]
   ProductionMetrics  ProductionMetrics[]
   Rejection          Rejection[]
   Department         Department           @relation(fields: [departmentId], references: [id])
@@ -510,6 +514,7 @@ model DowntimeState {
   startTime           DateTime
   updatedAt           DateTime @updatedAt
   workcenterId        String   @unique
+  orderId             String?
 }
 
 model MetricState {
@@ -524,6 +529,58 @@ model ProcessedState {
   lastProcessed DateTime?
   updatedAt     DateTime  @updatedAt
   workcenterId  String    @unique
+}
+
+model ProcessVariable {
+  id                      String                    @id
+  name                    String
+  unit                    String
+  description             String?
+  measurement             String
+  field                   String
+  deviceId                String
+  isMinLimitMonitoring    Boolean                   @default(false)
+  isMaxLimitMonitoring    Boolean                   @default(false)
+  minValueLimit           Float?
+  maxValueLimit           Float?
+  companyId               String?
+  departmentId            String?
+  workCenterId            String?
+  machineId               String?
+  createdAt               DateTime                  @default(now())
+  updatedAt               DateTime
+  deletedAt               DateTime?
+  lastvalue               Float                     @default(0)
+  Company                 Company?                  @relation(fields: [companyId], references: [id])
+  Department              Department?               @relation(fields: [departmentId], references: [id])
+  Machine                 Machine?                  @relation(fields: [machineId], references: [id])
+  WorkCenter              WorkCenter?               @relation(fields: [workCenterId], references: [id])
+  ProcessVariableAlertLog ProcessVariableAlertLog[]
+  ProcessVariableState    ProcessVariableState?
+}
+
+model ProcessVariableAlertLog {
+  id                   String                @id @default(cuid())
+  processVariableId    String
+  startTime            DateTime
+  endTime              DateTime?
+  peakValue            Float
+  limitType            String
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+  deletedAt            DateTime?
+  ProcessVariable      ProcessVariable       @relation(fields: [processVariableId], references: [id])
+  ProcessVariableState ProcessVariableState?
+}
+
+model ProcessVariableState {
+  id                      String                  @id @default(cuid())
+  processVariableId       String                  @unique
+  alertLogId              String                  @unique
+  createdAt               DateTime                @default(now())
+  updatedAt               DateTime                @updatedAt
+  ProcessVariableAlertLog ProcessVariableAlertLog @relation(fields: [alertLogId], references: [id])
+  ProcessVariable         ProcessVariable         @relation(fields: [processVariableId], references: [id])
 }
 
 enum Action {
@@ -567,6 +624,7 @@ enum Page {
   SISTEM
   CEP
   CEP_DASHBOARD
+  PROCESS_VARIABLE
 }
 
 enum WorkCenterStatus {

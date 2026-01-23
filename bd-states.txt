@@ -1,0 +1,4 @@
+ProcessedStateStore - Registra o horário do último registro (Utilizado para evitar reprocessamentos ou processar pontos fora de ordem cronológicas)
+MetricStateStore - Registra o id da última métrica    
+CounterStateStore - Registra o último valor contado com a seu respectivo tinmestamp (Só atualiza quando houver atualização do contador. Utilizado para identificar o início da parada)
+DowntimeStateStore - Registra a última parada

@@ -13,6 +13,7 @@ export const DowntimeStateStore = {
     data: {
       downtimeId: string;
       intervalId: string;
+      orderId: string | null;
       productionMetricsId: string;
       startTime: Date;
     };
@@ -26,5 +27,6 @@ export const DowntimeStateStore = {
 
   async delete({ workcenterId }: { workcenterId: string }) {
     await prisma.downtimeState.deleteMany({ where: { workcenterId } });
+    return null;
   },
 };
